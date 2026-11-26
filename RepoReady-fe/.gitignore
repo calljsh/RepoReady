@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.idea/
+.vscode/
+.agents/
+.playwright-cli/
+*.iml
+*.ipr
+*.iws
+.DS_Store
+.env
+.env.*
+!.env.example
+*.log

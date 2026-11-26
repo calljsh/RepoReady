@@ -1,46 +1,20 @@
-target/
 .idea/
-.claude/
-.codex/
-.cursor/
-.env
-.env.*
-!.env.example
-*.log
-!.mvn/wrapper/maven-wrapper.jar
-!**/src/main/**/target/
-!**/src/test/**/target/
-
-### IntelliJ IDEA ###
-.idea/modules.xml
-.idea/jarRepositories.xml
-.idea/compiler.xml
-.idea/libraries/
-*.iws
+.vscode/
+**/target/
+**/build/
+**/dist/
+**/node_modules/
+**/.idea/
+**/.claude/
+**/.codex/
+**/.cursor/
+**/.agents/
+**/.playwright-cli/
 *.iml
 *.ipr
-
-### Eclipse ###
-.apt_generated
-.classpath
-.factorypath
-.project
-.settings
-.springBeans
-.sts4-cache
-
-### NetBeans ###
-/nbproject/private/
-/nbbuild/
-/dist/
-/nbdist/
-/.nb-gradle/
-build/
-!**/src/main/**/build/
-!**/src/test/**/build/
-
-### VS Code ###
-.vscode/
-
-### Mac OS ###
+*.iws
+*.log
 .DS_Store
+**/.env
+**/.env.*
+!**/.env.example
