@@ -6,6 +6,8 @@ import javax.validation.Valid;
 import javax.validation.constraints.NotBlank;
 import org.springframework.web.bind.annotation.*;
 
+
+
 @RestController
 @RequestMapping("/api")
 public class ScanController {
@@ -18,6 +20,7 @@ public class ScanController {
     /** 扫描仓库默认分支当前指向的提交。 */
     @PostMapping("/reports/scan")
     public ScanReport scan(@Valid @RequestBody ScanRequest request) {
+        System.out.println("后端接口开始工作");
         return scanService.scan(request.repositoryUrl);
     }
 

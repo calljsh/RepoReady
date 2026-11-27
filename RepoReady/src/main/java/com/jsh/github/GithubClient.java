@@ -11,12 +11,15 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
 
 @Component
 public class GithubClient {
+    private static final Logger LOGGER = LoggerFactory.getLogger(GithubClient.class);
     private static final Pattern PART = Pattern.compile("[A-Za-z0-9_.-]{1,100}");
     private final RestTemplate http;
     private final ObjectMapper mapper;
@@ -35,6 +38,7 @@ public class GithubClient {
         this.http = new RestTemplate(factory);
         this.mapper = mapper;
         this.token = token;
+        LOGGER.info("GitHub API 访问模式：{}", token.isEmpty() ? "匿名" : "令牌认证");
     }
 
     /** 仅接受标准的 github.com 仓库地址。 */
@@ -76,8 +80,12 @@ public class GithubClient {
             if (code == 404) {
                 throw new GithubException(HttpStatus.NOT_FOUND, "仓库不存在或不可公开访问");
             }
-            if (code == 403 || code == 429) {
-                throw new GithubException(HttpStatus.TOO_MANY_REQUESTS, "GitHub 限流或拒绝访问，请稍后重试");
+            if (code == 429 || (code == 403 && exception.getResponseHeaders() != null
+                    && "0".equals(exception.getResponseHeaders().getFirst("X-RateLimit-Remaining")))) {
+                throw new GithubException(HttpStatus.TOO_MANY_REQUESTS, "GitHub 限流，请稍后重试");
+            }
+            if (code == 403) {
+                throw new GithubException(HttpStatus.FORBIDDEN, "GitHub 拒绝访问，请检查令牌权限");
             }
             throw new GithubException(HttpStatus.BAD_GATEWAY, "GitHub 请求失败，请稍后重试");
         } catch (ResourceAccessException exception) {

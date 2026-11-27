@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.jsh.github.GithubClient;
 import java.time.Instant;
 import java.util.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 
@@ -15,6 +17,7 @@ import org.springframework.stereotype.Service;
  */
 @Service
 public class ScanService {
+    private static final Logger LOGGER = LoggerFactory.getLogger(ScanService.class);
     private static final int MAX_FILES = 100;
     private static final int MAX_TOTAL_BYTES = 2 * 1024 * 1024;
     private static final int MAX_FILE_BYTES = 65536;
@@ -28,7 +31,9 @@ public class ScanService {
 
     /** 基于固定提交和受限的文件读取预算生成报告。 */
     public ScanReport scan(String url) {
+        long startedAt = System.nanoTime();
         String repo = github.repositoryPath(url); // 校验URL
+        LOGGER.info("仓库扫描开始：repository={}", repo);
         JsonNode metadata = github.get("/repos/" + repo);
         String branch = metadata.path("default_branch").asText();
         if (branch.isEmpty()){
@@ -40,6 +45,8 @@ public class ScanService {
         if (!sha.matches("[0-9a-f]{40}") || !treeSha.matches("[0-9a-f]{40}")) {
             throw new IllegalArgumentException("Invalid commit");
         }
+        LOGGER.info("仓库提交已定位：repository={} branch={} commit={} elapsedMs={}",
+                repo, branch, sha, elapsedMillis(startedAt));
         JsonNode tree = github.get("/repos/" + repo + "/git/trees/" + treeSha + "?recursive=1");
         ScanReport report = new ScanReport();
         report.repository = repo;
@@ -59,7 +66,10 @@ public class ScanService {
             if (eligible(path, entry.path("size").asInt(MAX_FILE_BYTES + 1))) candidates.add(entry);
         }
         candidates.sort(Comparator.comparingInt(e -> priority(e.path("path").asText())));
+        LOGGER.info("文件树筛选完成：repository={} totalFiles={} candidates={} truncated={} elapsedMs={}",
+                repo, report.totalFiles, candidates.size(), report.partialScan, elapsedMillis(startedAt));
         int bytes = 0;
+        int failedFiles = 0;
         for (JsonNode entry : candidates) {
             int size = entry.path("size").asInt();
             if (report.scannedFiles >= MAX_FILES || bytes + size > MAX_TOTAL_BYTES) {
@@ -73,14 +83,23 @@ public class ScanService {
                 bytes += size;
             } catch (RuntimeException exception) {
                 report.partialScan = true;
+                failedFiles++;
             }
         }
+        LOGGER.info("文件内容扫描完成：repository={} scannedFiles={} failedFiles={} readBytes={} elapsedMs={}",
+                repo, report.scannedFiles, failedFiles, bytes, elapsedMillis(startedAt));
         report.skippedFiles = report.totalFiles - report.scannedFiles;
         report.partialScan |= report.skippedFiles > 0;
         report.risks.sort(Comparator.comparingInt(f -> "HIGH".equals(f.severity) ? 0 : 1));
         report.categoryScores = rules.score(paths, report.risks);
         report.score = report.categoryScores.values().stream().mapToInt(Integer::intValue).sum();
+        LOGGER.info("仓库报告生成完成：repository={} commit={} score={} risks={} partialScan={} elapsedMs={}",
+                repo, sha, report.score, report.risks.size(), report.partialScan, elapsedMillis(startedAt));
         return report;
+    }
+
+    private long elapsedMillis(long startedAt) {
+        return (System.nanoTime() - startedAt) / 1_000_000;
     }
 
     private boolean eligible(String path, int size) {
